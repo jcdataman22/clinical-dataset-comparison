@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'" />
+    <title>Clinical Data Set Comparison</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="app-header">
+        <h1>Clinical Data Set Comparison</h1>
+        <p>Compare a previous and a current data transfer to see exactly what was added, removed, and changed — record by record and value by value.</p>
+        <span class="privacy-badge" title="No file ever leaves this browser tab.">🔒 100% in-browser — your data is never uploaded</span>
+      </header>
+
+      <!-- Step 1: files -->
+      <section class="card" id="filesCard">
+        <h2>1 · Load the two transfers</h2>
+        <div class="file-row">
+          <label class="drop" id="dropPrev">
+            <div class="label">Previous transfer</div>
+            <div class="hint">CSV — drop a file or click to browse</div>
+            <div class="filename" id="prevName"></div>
+            <input type="file" id="prevFile" accept=".csv,text/csv,text/plain" />
+          </label>
+          <label class="drop" id="dropCurr">
+            <div class="label">Current transfer</div>
+            <div class="hint">CSV — drop a file or click to browse</div>
+            <div class="filename" id="currName"></div>
+            <input type="file" id="currFile" accept=".csv,text/csv,text/plain" />
+          </label>
+        </div>
+        <div class="btn-row">
+          <button class="btn ghost" id="loadSample" type="button">Load sample SDTM lab data</button>
+        </div>
+      </section>
+
+      <!-- Step 2: config -->
+      <section class="card hidden" id="configCard">
+        <h2>2 · Choose how to match records</h2>
+        <div class="config-grid">
+          <div>
+            <div class="field">
+              <label class="field-label">Key columns (uniquely identify a record)</label>
+              <div class="chips" id="keyChips"></div>
+            </div>
+            <div class="field">
+              <label class="field-label">Context columns to show (e.g., test name)</label>
+              <div class="chips" id="labelChips"></div>
+            </div>
+            <div class="field">
+              <label class="field-label">Roll up changes by (subject)</label>
+              <select id="subjectSelect"></select>
+            </div>
+          </div>
+          <div>
+            <div class="field">
+              <label class="field-label">Columns to compare</label>
+              <div class="chips" id="compareChips"></div>
+            </div>
+            <div class="field">
+              <label class="field-label">Comparison options</label>
+              <div class="opts">
+                <label><input type="checkbox" id="optWhitespace" checked /> Ignore leading/trailing whitespace</label>
+                <label><input type="checkbox" id="optCase" /> Ignore letter case</label>
+                <label><input type="checkbox" id="optNumeric" /> Treat numerically equal values as unchanged (1.0 = 1)</label>
+                <label><input type="checkbox" id="optMissing" /> Treat NA / N/A / NULL / “.” as missing</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="compareBtn" type="button">Compare data sets</button>
+          <span class="rowcount" id="configHint"></span>
+        </div>
+      </section>
+
+      <!-- Step 3: results -->
+      <section class="card hidden" id="resultsCard">
+        <h2>3 · Results</h2>
+
+        <div id="notices"></div>
+
+        <div class="stat-grid" id="statGrid"></div>
+
+        <div class="spacer-lg"></div>
+
+        <div class="tabs" id="tabs"></div>
+
+        <div class="toolbar" id="toolbar">
+          <input type="text" id="search" placeholder="Filter rows…" />
+          <span class="rowcount" id="rowcount"></span>
+          <span class="spacer"></span>
+          <button class="btn secondary" id="exportBtn" type="button">Export this view (CSV)</button>
+        </div>
+
+        <div id="tabContent"></div>
+      </section>
+
+      <footer class="app-footer">
+        <p>
+          An open, in-browser reimplementation and extension of the
+          “Current and Previous Clinical Data Set Comparison” R workflow.
+          All processing happens locally; nothing is transmitted.
+        </p>
+      </footer>
+    </div>
+
+    <script src="core.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
