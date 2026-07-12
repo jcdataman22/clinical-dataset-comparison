@@ -583,22 +583,26 @@
     ];
 
     if (result.subjectSummary.length) {
+      // Use the actual column the user chose to summarize by, so the tab label,
+      // column header, and export name reflect that variable's name.
+      var summaryVar = result.config.subjectColumn || "group";
       state.tabs.push({
         id: "subjects",
-        label: "By subject",
+        label: "By " + summaryVar,
         count: result.subjectSummary.length,
-        columns: ["subject", "added", "removed", "changed", "total"],
+        columns: [summaryVar, "added", "removed", "changed", "total"],
         rows: result.subjectSummary.map(function (s) {
-          return {
-            subject: s.subject,
+          var row = {
             added: s.added,
             removed: s.removed,
             changed: s.changed,
             total: s.added + s.removed + s.changed,
           };
+          row[summaryVar] = s.subject;
+          return row;
         }),
         kind: "generic",
-        exportName: "subject_summary.csv",
+        exportName: "summary_by_" + summaryVar + ".csv",
       });
     }
 
