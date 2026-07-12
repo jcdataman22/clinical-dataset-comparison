@@ -72,7 +72,11 @@ To run the test suite, open `http://localhost:8722/tests.html` — it shows
 2. **Choose how to match records.**
    - **Key columns** — the columns that uniquely identify one record. SDTM
      identifiers (`STUDYID`, `DOMAIN`, `USUBJID`, and the first `*SEQ` column)
-     are pre-selected when present.
+     are pre-selected when present; for any other dataset the app infers the
+     key by finding the smallest, most-unique combination of columns whose
+     values are shared across both files (favoring stable identifiers over
+     changing measurements). A short note explains the choice, and you can
+     adjust the selection anytime.
    - **Context columns** — extra columns (e.g., `LBTEST`) shown alongside each
      change so a finding reads in plain language.
    - **Columns to compare** — which variables to diff (defaults to every

@@ -335,6 +335,164 @@
     return null;
   }
 
+  /**
+   * Infer the key columns for ANY dataset, without relying on naming
+   * conventions. Finds a small combination of shared columns whose combined
+   * values are (as close as possible to) unique within each file, preferring
+   * columns that look like stable identifiers rather than changing values.
+   *
+   * Strategy: rank the shared columns by a "keyness" score that rewards
+   * (a) value-domain overlap between the two files — stable identifiers repeat
+   * across transfers, whereas measurements drift — (b) distinctness, and
+   * (c) identifier-like names; then greedily add columns (best first) while
+   * they reduce the number of colliding rows, stopping at a unique key.
+   *
+   * @returns {{keyColumns, unique, collisions, matchRate, reason}}
+   */
+  function inferKeyColumns(previous, current, options) {
+    options = options || {};
+    var maxCols = options.maxKeyColumns || 5;
+    var sampleN = options.sampleRows || 5000;
+
+    var prevAll = (previous && previous.records) || [];
+    var currAll = (current && current.records) || [];
+    var prevRows = prevAll.length > sampleN ? prevAll.slice(0, sampleN) : prevAll;
+    var currRows = currAll.length > sampleN ? currAll.slice(0, sampleN) : currAll;
+
+    var common =
+      options.common ||
+      intersect((current && current.headers) || [], (previous && previous.headers) || []);
+
+    if (common.length === 0) {
+      return {
+        keyColumns: [],
+        unique: false,
+        collisions: 0,
+        matchRate: 0,
+        reason: "the two files share no columns, so records can't be matched.",
+      };
+    }
+
+    function val(row, col) {
+      var v = row[col];
+      return v == null ? "" : String(v).trim();
+    }
+    function compositeKey(row, cols) {
+      var parts = [];
+      for (var i = 0; i < cols.length; i++) parts.push(val(row, cols[i]));
+      return parts.join("");
+    }
+    function duplicateRows(rows, cols) {
+      if (cols.length === 0) return rows.length ? rows.length - 1 : 0;
+      var seen = Object.create(null);
+      var distinct = 0;
+      for (var i = 0; i < rows.length; i++) {
+        var k = compositeKey(rows[i], cols);
+        if (!seen[k]) {
+          seen[k] = true;
+          distinct++;
+        }
+      }
+      return rows.length - distinct;
+    }
+    function collisions(cols) {
+      return duplicateRows(prevRows, cols) + duplicateRows(currRows, cols);
+    }
+
+    function keyness(col) {
+      var pv = Object.create(null);
+      var cv = Object.create(null);
+      var pNull = 0, cNull = 0, pDistinct = 0, cDistinct = 0, i, v;
+      for (i = 0; i < prevRows.length; i++) {
+        v = val(prevRows[i], col);
+        if (v === "") pNull++;
+        if (!pv[v]) { pv[v] = true; if (v !== "") pDistinct++; }
+      }
+      for (i = 0; i < currRows.length; i++) {
+        v = val(currRows[i], col);
+        if (v === "") cNull++;
+        if (!cv[v]) { cv[v] = true; if (v !== "") cDistinct++; }
+      }
+      var inter = 0;
+      var unionObj = Object.create(null);
+      Object.keys(pv).forEach(function (k) { if (k !== "") unionObj[k] = true; });
+      Object.keys(cv).forEach(function (k) { if (k !== "") unionObj[k] = true; });
+      Object.keys(pv).forEach(function (k) { if (k !== "" && cv[k]) inter++; });
+      var unionCount = Object.keys(unionObj).length;
+      var overlap = unionCount ? inter / unionCount : 0;
+      var drPrev = prevRows.length ? pDistinct / prevRows.length : 0;
+      var drCurr = currRows.length ? cDistinct / currRows.length : 0;
+      var distinctRatio = Math.min(drPrev, drCurr);
+      var nullRate =
+        prevRows.length + currRows.length
+          ? (pNull + cNull) / (prevRows.length + currRows.length)
+          : 0;
+      var name = col.toLowerCase();
+      var nameHint =
+        /(^|[^a-z])(id|key|seq|no|num|code|idx|index|uuid|guid|subj|subject|visit|record)([^a-z]|$)/.test(name) ||
+        /id$|seq$|no$|num$|code$|key$/.test(name)
+          ? 1
+          : 0;
+      return overlap * 3 + distinctRatio * 2 + nameHint * 1.5 - nullRate * 2;
+    }
+
+    var scored = common.map(function (col) {
+      return { col: col, score: keyness(col) };
+    });
+    scored.sort(function (a, b) {
+      return b.score - a.score;
+    });
+    var ranked = scored.map(function (s) {
+      return s.col;
+    });
+
+    var chosen = [];
+    var best = collisions([]);
+    for (var r = 0; r < ranked.length && chosen.length < maxCols; r++) {
+      var trial = chosen.concat([ranked[r]]);
+      var c = collisions(trial);
+      if (c < best) {
+        chosen = trial;
+        best = c;
+        if (best === 0) break;
+      }
+    }
+    if (chosen.length === 0) chosen = [ranked[0] || common[0]];
+
+    // Fraction of keys shared between the two files (identifier stability).
+    function keySet(rows, cols) {
+      var s = Object.create(null);
+      for (var i = 0; i < rows.length; i++) s[compositeKey(rows[i], cols)] = true;
+      return s;
+    }
+    var ksPrev = keySet(prevRows, chosen);
+    var ksCurr = keySet(currRows, chosen);
+    var prevKeys = Object.keys(ksPrev);
+    var currKeys = Object.keys(ksCurr);
+    var shared = 0;
+    prevKeys.forEach(function (k) {
+      if (ksCurr[k]) shared++;
+    });
+    var denom = Math.min(prevKeys.length, currKeys.length) || 1;
+    var matchRate = shared / denom;
+
+    var unique = best === 0;
+    var pct = Math.round(matchRate * 100);
+    var reason = unique
+      ? "these columns uniquely identify every record, and " + pct + "% of keys appear in both files."
+      : "this is the most-unique combination found; " +
+        best + " row" + (best === 1 ? "" : "s") +
+        " still share a key, and " + pct + "% of keys appear in both files.";
+
+    return {
+      keyColumns: chosen,
+      unique: unique,
+      collisions: best,
+      matchRate: matchRate,
+      reason: reason,
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Main comparison
   // ---------------------------------------------------------------------------
@@ -661,6 +819,7 @@
     autoDetectKeys: autoDetectKeys,
     autoDetectLabels: autoDetectLabels,
     autoDetectSubject: autoDetectSubject,
+    inferKeyColumns: inferKeyColumns,
     // main
     defaultConfig: defaultConfig,
     compareDatasets: compareDatasets,

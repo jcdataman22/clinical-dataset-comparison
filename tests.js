@@ -215,6 +215,104 @@
   });
 
   // ==========================================================================
+  // inferKeyColumns — standard-agnostic key discovery
+  // ==========================================================================
+
+  function ds2(headers, records) {
+    return { headers: headers, records: records };
+  }
+
+  test("inferKeyColumns: picks a single unique id column", function () {
+    var prev = ds2(["id", "name", "score"], [
+      { id: "1", name: "Ann", score: "10" },
+      { id: "2", name: "Bob", score: "20" },
+      { id: "3", name: "Cy", score: "30" },
+    ]);
+    var curr = ds2(["id", "name", "score"], [
+      { id: "1", name: "Ann", score: "11" },
+      { id: "2", name: "Bob", score: "20" },
+      { id: "4", name: "Di", score: "40" },
+    ]);
+    var r = C.inferKeyColumns(prev, curr);
+    deepEq(r.keyColumns, ["id"]);
+    ok(r.unique, "id should be a unique key");
+  });
+
+  test("inferKeyColumns: composites two columns when neither is unique alone", function () {
+    var prev = ds2(["grp", "seq", "val"], [
+      { grp: "A", seq: "1", val: "x" },
+      { grp: "A", seq: "2", val: "y" },
+      { grp: "B", seq: "1", val: "z" },
+    ]);
+    var curr = ds2(["grp", "seq", "val"], [
+      { grp: "A", seq: "1", val: "x2" },
+      { grp: "A", seq: "2", val: "y" },
+      { grp: "B", seq: "1", val: "z" },
+    ]);
+    var r = C.inferKeyColumns(prev, curr);
+    ok(r.unique, "grp+seq should be unique");
+    ok(r.keyColumns.indexOf("grp") !== -1 && r.keyColumns.indexOf("seq") !== -1, "should include grp and seq");
+    ok(r.keyColumns.indexOf("val") === -1, "should not pick the changing value column");
+  });
+
+  test("inferKeyColumns: prefers stable identifier over a unique but changing value", function () {
+    // 'reading' is unique in each file but changes between files (low overlap);
+    // 'sensor' is a stable identifier shared across files.
+    var prev = ds2(["sensor", "reading"], [
+      { sensor: "S1", reading: "100" },
+      { sensor: "S2", reading: "200" },
+      { sensor: "S3", reading: "300" },
+    ]);
+    var curr = ds2(["sensor", "reading"], [
+      { sensor: "S1", reading: "101" },
+      { sensor: "S2", reading: "202" },
+      { sensor: "S3", reading: "303" },
+    ]);
+    var r = C.inferKeyColumns(prev, curr);
+    deepEq(r.keyColumns, ["sensor"]);
+  });
+
+  test("inferKeyColumns: reports collisions when data has a true duplicate", function () {
+    var prev = ds2(["id", "v"], [
+      { id: "1", v: "a" },
+      { id: "1", v: "a" },
+      { id: "2", v: "b" },
+    ]);
+    var curr = ds2(["id", "v"], [
+      { id: "1", v: "a" },
+      { id: "2", v: "b" },
+    ]);
+    var r = C.inferKeyColumns(prev, curr);
+    deepEq(r.keyColumns, ["id"]);
+    eq(r.unique, false);
+    eq(r.collisions, 1);
+  });
+
+  test("inferKeyColumns: no shared columns is reported", function () {
+    var prev = ds2(["a"], [{ a: "1" }]);
+    var curr = ds2(["b"], [{ b: "1" }]);
+    var r = C.inferKeyColumns(prev, curr);
+    deepEq(r.keyColumns, []);
+    eq(r.unique, false);
+  });
+
+  test("inferKeyColumns: works on SDTM-style data", function () {
+    var prev = ds2(["STUDYID", "USUBJID", "LBSEQ", "LBORRES"], [
+      { STUDYID: "S", USUBJID: "P1", LBSEQ: "1", LBORRES: "5" },
+      { STUDYID: "S", USUBJID: "P1", LBSEQ: "2", LBORRES: "6" },
+      { STUDYID: "S", USUBJID: "P2", LBSEQ: "1", LBORRES: "7" },
+    ]);
+    var curr = ds2(["STUDYID", "USUBJID", "LBSEQ", "LBORRES"], [
+      { STUDYID: "S", USUBJID: "P1", LBSEQ: "1", LBORRES: "50" },
+      { STUDYID: "S", USUBJID: "P1", LBSEQ: "2", LBORRES: "6" },
+      { STUDYID: "S", USUBJID: "P2", LBSEQ: "1", LBORRES: "7" },
+    ]);
+    var r = C.inferKeyColumns(prev, curr);
+    ok(r.unique, "inferred key should be unique");
+    ok(r.keyColumns.indexOf("LBORRES") === -1, "should not use the result value as a key");
+  });
+
+  // ==========================================================================
   // compareDatasets — the heart of the tool
   // ==========================================================================
 

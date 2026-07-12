@@ -101,7 +101,21 @@
     var common = intersect(state.curr.headers, state.prev.headers);
 
     // Seed selections from auto-detection (only on first reveal).
-    var keys = C.autoDetectKeys(common);
+    // SDTM identifiers are a fast path; otherwise infer keys by uniqueness so
+    // the app works on any dataset regardless of naming convention.
+    var sdtmKeys = C.autoDetectKeys(common);
+    var looksSdtm = sdtmKeys.some(function (k) {
+      return /^(STUDYID|DOMAIN|USUBJID|SUBJID)$/i.test(k) || /SEQ$/i.test(k);
+    });
+    var keys, keyHintText;
+    if (looksSdtm) {
+      keys = sdtmKeys;
+      keyHintText = "Auto-selected from recognized SDTM identifier columns — adjust if needed.";
+    } else {
+      var inferred = C.inferKeyColumns(state.prev, state.curr, { common: common });
+      keys = inferred.keyColumns;
+      keyHintText = "Auto-detected by uniqueness — " + inferred.reason + " Adjust if needed.";
+    }
     var labels = C.autoDetectLabels(common, keys);
     state.keySel = {};
     state.labelSel = {};
@@ -132,6 +146,7 @@
     var auto = C.autoDetectSubject(common);
     if (auto) subjectSel.value = auto;
 
+    $("keyHint").textContent = keyHintText;
     $("configCard").classList.remove("hidden");
     $("configCard").scrollIntoView({ behavior: "smooth", block: "start" });
     updateConfigHint();
