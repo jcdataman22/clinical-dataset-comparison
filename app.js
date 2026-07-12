@@ -133,6 +133,7 @@
     if (auto) subjectSel.value = auto;
 
     $("configCard").classList.remove("hidden");
+    $("configCard").scrollIntoView({ behavior: "smooth", block: "start" });
     updateConfigHint();
   }
 
@@ -280,7 +281,8 @@
         dups.forEach(function (d) {
           var vals = keyCols
             .map(function (kc) {
-              return d.record[kc] != null ? d.record[kc] : "";
+              var v = d.record[kc] != null ? d.record[kc] : "";
+              return kc + " " + v;
             })
             .join(" · ");
           dupList.push(

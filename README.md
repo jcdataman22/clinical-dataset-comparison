@@ -101,6 +101,11 @@ relative, so it works correctly under that sub-path, and the demo CSVs
 load over same-origin HTTPS. Uploaded files are still read locally in the
 visitor's browser — publishing the app does not publish any data.
 
+When you change `styles.css`, `core.js`, or `app.js`, bump the `?v=` number on
+their `<link>` / `<script>` tags in `index.html`. Those version tags let a
+browser cache the assets normally but fetch the new copy immediately after a
+deploy, so visitors never end up on a stale mix of old and new files.
+
 ## Security & privacy
 
 - **No network egress.** Files are read with the browser `FileReader`; nothing

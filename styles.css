@@ -7,8 +7,9 @@
   --border: #e2e8f0;
   --text: #0f172a;
   --muted: #64748b;
-  --accent: #2563eb;
-  --accent-weak: #dbeafe;
+  --accent: #1f6fb2;
+  --accent-weak: #e3eff8;
+  --brand-title: #17456b;
   --added: #16a34a;
   --added-bg: #dcfce7;
   --removed: #dc2626;
@@ -28,8 +29,9 @@
     --border: #1f2937;
     --text: #e5e7eb;
     --muted: #94a3b8;
-    --accent: #3b82f6;
-    --accent-weak: #1e293b;
+    --accent: #4d9fd8;
+    --accent-weak: #12324c;
+    --brand-title: #d6e6f4;
     --added: #4ade80;
     --added-bg: #052e16;
     --removed: #f87171;
@@ -53,7 +55,7 @@ body {
 .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; }
 
 header.app-header { margin-bottom: 20px; }
-header.app-header h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+header.app-header h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; color: var(--brand-title); }
 header.app-header p { margin: 0; color: var(--muted); }
 
 .privacy-badge {
