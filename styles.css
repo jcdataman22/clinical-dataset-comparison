@@ -177,6 +177,8 @@ select, input[type="text"] {
 }
 .notice.warn { background: var(--modified-bg); border-color: color-mix(in srgb, var(--modified) 40%, transparent); color: var(--modified); }
 .notice.info { background: var(--accent-weak); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.notice.observation { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); color: var(--text); }
+.notice.observation strong { color: var(--text); }
 .notice strong { display: block; margin-bottom: 4px; }
 .notice ul { margin: 6px 0 0; padding-left: 18px; }
 

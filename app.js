@@ -243,7 +243,7 @@
       if (sch.removedColumns.length)
         items.push(el("li", null, ["Columns dropped since previous: ", el("strong", null, [sch.removedColumns.join(", ")])]));
       notices.appendChild(
-        el("div", { class: "notice info" }, [
+        el("div", { class: "notice observation" }, [
           el("strong", null, ["Structure changed between transfers"]),
           el("ul", null, items),
         ])
@@ -253,12 +253,53 @@
     var dupPrev = result.keyIssues.duplicatePreviousKeys;
     var dupCurr = result.keyIssues.duplicateCurrentKeys;
     if (dupPrev.length || dupCurr.length) {
+      var keyCols = result.config.keyColumns;
+
+      // State which dataset(s) contain the repeated keys.
+      var where;
+      if (dupPrev.length && dupCurr.length) {
+        where =
+          "Both datasets have rows that repeat a key value — " +
+          dupPrev.length + " in the previous dataset and " +
+          dupCurr.length + " in the current dataset.";
+      } else if (dupPrev.length) {
+        where =
+          "The previous dataset has " + dupPrev.length + " key value" +
+          (dupPrev.length > 1 ? "s that appear" : " that appears") +
+          " on more than one row.";
+      } else {
+        where =
+          "The current dataset has " + dupCurr.length + " key value" +
+          (dupCurr.length > 1 ? "s that appear" : " that appears") +
+          " on more than one row.";
+      }
+
+      // List each repeated key, labeled with the dataset it came from.
+      var dupList = [];
+      function pushDup(dataset, dups) {
+        dups.forEach(function (d) {
+          var vals = keyCols
+            .map(function (kc) {
+              return d.record[kc] != null ? d.record[kc] : "";
+            })
+            .join(" · ");
+          dupList.push(
+            el("li", null, [
+              dataset + " — ",
+              el("strong", null, [vals]),
+              " (" + d.count + " rows)",
+            ])
+          );
+        });
+      }
+      pushDup("Previous", dupPrev);
+      pushDup("Current", dupCurr);
+
       notices.appendChild(
-        el("div", { class: "notice warn" }, [
-          el("strong", null, ["Duplicate keys detected — results use the first occurrence"]),
-          "The chosen key columns don't uniquely identify every row (" +
-            dupPrev.length + " duplicated key(s) in previous, " +
-            dupCurr.length + " in current). Add another key column for a precise comparison.",
+        el("div", { class: "notice observation" }, [
+          el("strong", null, ["Potential duplicate records"]),
+          where + " These rows may be duplicates; the comparison matches on the first row for each key.",
+          el("ul", null, dupList),
         ])
       );
     }
