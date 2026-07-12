@@ -571,10 +571,6 @@
       });
   }
 
-  function loadSample() {
-    loadPair("sample_previous.csv", "sample_current.csv");
-  }
-
   function loadDemo() {
     loadPair("demo_previous.csv", "demo_current.csv");
   }
@@ -585,7 +581,6 @@
   function init() {
     setupDrop("dropPrev", "prevFile", "prevName", "prev");
     setupDrop("dropCurr", "currFile", "currName", "curr");
-    $("loadSample").addEventListener("click", loadSample);
     $("loadDemo").addEventListener("click", loadDemo);
     $("compareBtn").addEventListener("click", runCompare);
     $("exportBtn").addEventListener("click", exportCurrent);

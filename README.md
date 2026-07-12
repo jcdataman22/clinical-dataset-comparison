@@ -47,7 +47,7 @@ needs to see.
 
 ## Running it
 
-Because the browser blocks `fetch()` of the bundled sample files from
+Because the browser blocks `fetch()` of the bundled demo files from
 `file://`, serve the folder over HTTP (any static server works):
 
 ```bash
@@ -60,15 +60,15 @@ To run the test suite, open `http://localhost:8722/tests.html` — it shows
 `44 passed, 0 failed` and lists every case.
 
 > You can also open `index.html` directly from disk and use the two file
-> pickers; only the **Load sample** button requires the local server.
+> pickers; only the **Load demo datasets** button requires the local server.
 
 ---
 
 ## How to use
 
 1. **Load the two transfers.** Drop or browse to your *previous* and *current*
-   CSVs (or click **Load sample SDTM lab data** for a simple example, or
-   **Load demo datasets** to exercise every capability at once).
+   CSVs (or click **Load demo datasets** to try it with built-in example data
+   that exercises every capability at once).
 2. **Choose how to match records.**
    - **Key columns** — the columns that uniquely identify one record. SDTM
      identifiers (`STUDYID`, `DOMAIN`, `USUBJID`, and the first `*SEQ` column)
@@ -97,7 +97,7 @@ This app is just static files, so it can be hosted as-is (no build step). Once
 the repository is on GitHub, open **Settings → Pages**, set the source to the
 `main` branch (root folder), and save. Your site publishes at
 `https://<username>.github.io/<repo>/` within a minute or two. All paths are
-relative, so it works correctly under that sub-path, and the sample/demo CSVs
+relative, so it works correctly under that sub-path, and the demo CSVs
 load over same-origin HTTPS. Uploaded files are still read locally in the
 visitor's browser — publishing the app does not publish any data.
 
@@ -128,7 +128,7 @@ the files on your own machine.
 | `app.js` | UI: file loading, config, rendering, export |
 | `core.js` | Dependency-free comparison engine (CSV parse + diff) |
 | `tests.html` / `tests.js` | Browser-based unit tests (44 cases) |
-| `sample_previous.csv` / `sample_current.csv` | Demo SDTM lab data |
+| `demo_previous.csv` / `demo_current.csv` | Built-in demo SDTM lab data |
 
 ---
 
