@@ -68,7 +68,7 @@ To run the test suite, open `http://localhost:8722/tests.html` — it shows
 
 1. **Load the two transfers.** Drop or browse to your *previous* and *current*
    CSVs (or click **Load sample SDTM lab data** for a simple example, or
-   **Load demo (all features)** to exercise every capability at once).
+   **Load demo datasets** to exercise every capability at once).
 2. **Choose how to match records.**
    - **Key columns** — the columns that uniquely identify one record. SDTM
      identifiers (`STUDYID`, `DOMAIN`, `USUBJID`, and the first `*SEQ` column)
