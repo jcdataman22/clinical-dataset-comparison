@@ -129,6 +129,18 @@ the files on your own machine.
 
 ---
 
+## Performance & large files
+
+Parsing and comparison run in a **Web Worker**, so the page stays responsive on
+big datasets, with a small progress indicator during long runs. Everything is
+in-memory: tens of thousands of rows compare in well under a second; hundreds of
+thousands take a few seconds and use more RAM. A heads-up appears when a file has
+100,000+ rows. If a Web Worker isn't available (for example, when the page is
+opened directly over `file://`), the app falls back to running on the main
+thread.
+
+---
+
 ## Files
 
 | File | Purpose |
@@ -137,7 +149,9 @@ the files on your own machine.
 | `styles.css` | Styling (light/dark aware) |
 | `app.js` | UI: file loading, config, rendering, export |
 | `core.js` | Dependency-free comparison engine (CSV parse + diff) |
-| `tests.html` / `tests.js` | Browser-based unit tests (44 cases) |
+| `engine-core.js` | Parse/analyze/compare orchestration shared by the page and worker |
+| `worker.js` | Web Worker that runs parsing and comparison off the main thread |
+| `tests.html` / `tests.js` | Browser-based unit tests (51 cases) |
 | `demo_previous.csv` / `demo_current.csv` | Built-in SDTM lab demo |
 | `demo_other_previous.csv` / `demo_other_current.csv` | Built-in non-SDTM inventory demo |
 

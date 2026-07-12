@@ -3,16 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'" />
     <title>Clinical Data Set Comparison</title>
-    <link rel="stylesheet" href="styles.css?v=4" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body>
     <div class="wrap">
       <header class="app-header">
         <h1>Clinical Data Set Comparison</h1>
         <p>Compare a previous and a current data transfer to see exactly what was added, removed, and changed — record by record and value by value.</p>
-        <span class="privacy-badge" title="No file ever leaves this browser tab.">🔒 100% in-browser — your data is never uploaded</span>
+        <button class="privacy-badge" id="privacyBadge" type="button" aria-haspopup="dialog">
+          <span class="privacy-icon" aria-hidden="true">🔒</span>
+          <span>This web app processes data in your browser. Nothing gets uploaded to a server. <span class="privacy-more">Click here for more information</span></span>
+        </button>
       </header>
 
       <!-- Step 1: files -->
@@ -41,6 +44,7 @@
       <!-- Step 2: config -->
       <section class="card hidden" id="configCard">
         <h2>2 · Choose how to match records</h2>
+        <div class="notice observation hidden" id="sizeNotice"></div>
         <div class="config-grid">
           <div>
             <div class="field">
@@ -110,7 +114,32 @@
       </footer>
     </div>
 
-    <script src="core.js?v=4"></script>
-    <script src="app.js?v=4"></script>
+    <!-- Progress indicator, shown only when a run takes long enough to matter -->
+    <div class="progress hidden" id="progress" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
+      <span id="progressText">Working…</span>
+    </div>
+
+    <!-- Data-protection details -->
+    <div class="modal-overlay hidden" id="privacyModal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="privacyTitle">
+        <button class="modal-close" id="privacyModalClose" type="button" aria-label="Close">×</button>
+        <h2 id="privacyTitle">How your data is protected</h2>
+        <p class="modal-lead">Everything in this tool happens inside your own browser. Your data is never sent anywhere.</p>
+        <ul class="modal-list">
+          <li><strong>Read locally.</strong> When you load CSV files, the browser reads them on your device with its built-in file reader. They stay in memory only while you work.</li>
+          <li><strong>Never uploaded.</strong> The app makes no network request that carries your data. A strict Content-Security-Policy tells your browser to block any connection to another server.</li>
+          <li><strong>Not stored.</strong> Nothing is written to disk, cookies, or browser storage — close the tab and the data is gone. Files you choose to <em>Export</em> are saved to your own computer.</li>
+          <li><strong>No third parties.</strong> No analytics, trackers, ads, or external code — just a few small files served as static content.</li>
+          <li><strong>Works offline.</strong> Once the page has loaded you can disconnect from the internet and it still works — the simplest proof that nothing needs to be sent.</li>
+        </ul>
+        <p class="modal-note">Like any website, the host sees your browser request the page and your IP address, but never your file contents. Browser extensions you install can read any page you open, so use ones you trust.</p>
+        <p class="modal-verify">Want to verify it yourself? Open your browser's Network tab, load a file, and run a comparison — you'll see no request carrying your data.</p>
+      </div>
+    </div>
+
+    <script src="core.js?v=5"></script>
+    <script src="engine-core.js?v=5"></script>
+    <script src="app.js?v=5"></script>
   </body>
 </html>

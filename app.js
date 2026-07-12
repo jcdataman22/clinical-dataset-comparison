@@ -8,9 +8,11 @@
 
   var C = window.CDC;
   var RENDER_LIMIT = 2000; // cap DOM rows; exports always include everything
+  var LARGE_ROWS = 100000; // show a heads-up at/above this row count
+  var engine = null; // compute engine: Web Worker when available, else main thread
 
   var state = {
-    prev: null, // { headers, records, name }
+    prev: null, // { name, headers, rowCount } — parsed records live in the engine
     curr: null,
     keySel: {}, // column -> bool
     labelSel: {},
@@ -51,6 +53,176 @@
   }
 
   // --------------------------------------------------------------------------
+  // Compute engine — Web Worker when available, main-thread fallback otherwise
+  // --------------------------------------------------------------------------
+  function createEngine(onProgress) {
+    if (typeof Worker !== "undefined") {
+      try {
+        var w = new Worker("worker.js?v=5");
+        var eng = workerEngine(w, onProgress);
+        // Validate the worker (catches CSP / importScripts failures, file://,
+        // etc.). If it can't run, quietly downgrade to the main-thread engine.
+        eng.__probe().catch(function () {
+          engine = mainEngine(onProgress);
+        });
+        return eng;
+      } catch (e) {
+        /* Worker constructor blocked — fall through to the main-thread engine. */
+      }
+    }
+    return mainEngine(onProgress);
+  }
+
+  function workerEngine(worker, onProgress) {
+    var seq = 0;
+    var pending = {};
+    worker.onmessage = function (e) {
+      var m = e.data || {};
+      if (m.type === "progress") {
+        if (onProgress) onProgress(m.stage);
+        return;
+      }
+      if (m.type === "done") {
+        var p = pending[m.id];
+        if (!p) return;
+        delete pending[m.id];
+        if (m.error) p.reject(new Error(m.error));
+        else p.resolve(m.result);
+      }
+    };
+    worker.onerror = function () {
+      Object.keys(pending).forEach(function (id) {
+        pending[id].reject(new Error("The background worker failed."));
+        delete pending[id];
+      });
+    };
+    function send(type, extra) {
+      return new Promise(function (resolve, reject) {
+        var id = ++seq;
+        pending[id] = { resolve: resolve, reject: reject };
+        var msg = { type: type, id: id };
+        if (extra) {
+          Object.keys(extra).forEach(function (k) {
+            msg[k] = extra[k];
+          });
+        }
+        worker.postMessage(msg);
+      });
+    }
+    return {
+      mode: "worker",
+      parse: function (which, name, text) {
+        return send("parse", { which: which, name: name, text: text });
+      },
+      analyze: function () {
+        return send("analyze");
+      },
+      compare: function (config) {
+        return send("compare", { config: config });
+      },
+      __probe: function () {
+        return Promise.race([
+          send("ping"),
+          new Promise(function (_, reject) {
+            setTimeout(function () {
+              reject(new Error("worker timeout"));
+            }, 3000);
+          }),
+        ]);
+      },
+    };
+  }
+
+  function mainEngine(onProgress) {
+    var core = new EngineCore();
+    function defer(stage, fn) {
+      if (onProgress) onProgress(stage);
+      return new Promise(function (resolve, reject) {
+        // Defer so the progress indicator can paint before a blocking run.
+        setTimeout(function () {
+          try {
+            resolve(fn());
+          } catch (e) {
+            reject(e);
+          }
+        }, 0);
+      });
+    }
+    return {
+      mode: "main",
+      parse: function (which, name, text) {
+        return defer("Parsing " + name + "…", function () {
+          return core.parse(which, name, text);
+        });
+      },
+      analyze: function () {
+        return defer("Analyzing columns…", function () {
+          return core.analyze();
+        });
+      },
+      compare: function (config) {
+        return defer("Comparing datasets…", function () {
+          return core.compare(config);
+        });
+      },
+    };
+  }
+
+  // --------------------------------------------------------------------------
+  // Progress indicator (revealed only when a run takes long enough to matter)
+  // --------------------------------------------------------------------------
+  var progressTimer = null;
+  function beginProgress(stage) {
+    updateProgressText(stage);
+    clearTimeout(progressTimer);
+    progressTimer = setTimeout(function () {
+      $("progress").classList.remove("hidden");
+    }, 120);
+  }
+  function updateProgressText(stage) {
+    $("progressText").textContent = stage || "Working…";
+  }
+  function endProgress() {
+    clearTimeout(progressTimer);
+    $("progress").classList.add("hidden");
+  }
+
+  // --------------------------------------------------------------------------
+  // Privacy details modal
+  // --------------------------------------------------------------------------
+  function openPrivacy() {
+    $("privacyModal").classList.remove("hidden");
+  }
+  function closePrivacy() {
+    $("privacyModal").classList.add("hidden");
+  }
+
+  // --------------------------------------------------------------------------
+  // Large-dataset heads-up
+  // --------------------------------------------------------------------------
+  function renderSizeNotice() {
+    var host = $("sizeNotice");
+    clear(host);
+    var pRows = state.prev.rowCount;
+    var cRows = state.curr.rowCount;
+    if (pRows < LARGE_ROWS && cRows < LARGE_ROWS) {
+      host.classList.add("hidden");
+      return;
+    }
+    var tail =
+      engine && engine.mode === "worker"
+        ? "The comparison runs in a background worker, so the page stays responsive, but it may take a few seconds and use extra memory."
+        : "The comparison may pause the page for a few seconds and use extra memory while it runs.";
+    host.appendChild(el("strong", null, ["Large dataset"]));
+    host.appendChild(
+      document.createTextNode(
+        " Previous: " + pRows.toLocaleString() + " rows · Current: " + cRows.toLocaleString() + " rows. " + tail
+      )
+    );
+    host.classList.remove("hidden");
+  }
+
+  // --------------------------------------------------------------------------
   // File loading
   // --------------------------------------------------------------------------
   function setupDrop(dropId, inputId, nameId, which) {
@@ -80,11 +252,20 @@
   function readFile(file, which, nameEl) {
     var reader = new FileReader();
     reader.onload = function () {
-      var parsed = C.parseCSV(String(reader.result));
-      parsed.name = file.name;
-      state[which] = parsed;
-      nameEl.textContent = file.name + " · " + parsed.records.length + " rows · " + parsed.headers.length + " cols";
-      maybeShowConfig();
+      beginProgress("Parsing " + file.name + "…");
+      engine
+        .parse(which, file.name, String(reader.result))
+        .then(function (info) {
+          endProgress();
+          state[which] = { name: file.name, headers: info.headers, rowCount: info.rowCount };
+          nameEl.textContent =
+            file.name + " · " + info.rowCount + " rows · " + info.headers.length + " cols";
+          maybeShowConfig();
+        })
+        .catch(function (e) {
+          endProgress();
+          nameEl.textContent = "Could not process file: " + ((e && e.message) || e);
+        });
     };
     reader.onerror = function () {
       nameEl.textContent = "Could not read file.";
@@ -98,58 +279,54 @@
   function maybeShowConfig() {
     if (!state.prev || !state.curr) return;
 
-    var common = intersect(state.curr.headers, state.prev.headers);
+    beginProgress("Analyzing columns…");
+    engine
+      .analyze()
+      .then(function (a) {
+        endProgress();
+        var common = a.common;
+        state.common = common;
+        var keys = a.suggestedKeys;
+        var labels = a.labels;
 
-    // Seed selections from auto-detection (only on first reveal).
-    // SDTM identifiers are a fast path; otherwise infer keys by uniqueness so
-    // the app works on any dataset regardless of naming convention.
-    var sdtmKeys = C.autoDetectKeys(common);
-    var looksSdtm = sdtmKeys.some(function (k) {
-      return /^(STUDYID|DOMAIN|USUBJID|SUBJID)$/i.test(k) || /SEQ$/i.test(k);
-    });
-    var keys, keyHintText;
-    if (looksSdtm) {
-      keys = sdtmKeys;
-      keyHintText = "Auto-selected from recognized SDTM identifier columns — adjust if needed.";
-    } else {
-      var inferred = C.inferKeyColumns(state.prev, state.curr, { common: common });
-      keys = inferred.keyColumns;
-      keyHintText = "Auto-detected by uniqueness — " + inferred.reason + " Adjust if needed.";
-    }
-    var labels = C.autoDetectLabels(common, keys);
-    state.keySel = {};
-    state.labelSel = {};
-    state.compareSel = {};
-    keys.forEach(function (k) {
-      state.keySel[k] = true;
-    });
-    labels.forEach(function (l) {
-      state.labelSel[l] = true;
-    });
-    common.forEach(function (c) {
-      if (keys.indexOf(c) === -1) state.compareSel[c] = true;
-    });
+        state.keySel = {};
+        state.labelSel = {};
+        state.compareSel = {};
+        keys.forEach(function (k) {
+          state.keySel[k] = true;
+        });
+        labels.forEach(function (l) {
+          state.labelSel[l] = true;
+        });
+        common.forEach(function (c) {
+          if (keys.indexOf(c) === -1) state.compareSel[c] = true;
+        });
 
-    buildChips("keyChips", common, state.keySel, function () {
-      refreshCompareChips();
-    });
-    buildChips("labelChips", common, state.labelSel, null);
-    refreshCompareChips();
+        buildChips("keyChips", common, state.keySel, function () {
+          refreshCompareChips();
+        });
+        buildChips("labelChips", common, state.labelSel, null);
+        refreshCompareChips();
 
-    // Subject dropdown.
-    var subjectSel = $("subjectSelect");
-    clear(subjectSel);
-    subjectSel.appendChild(el("option", { value: "" }, ["(none)"]));
-    common.forEach(function (c) {
-      subjectSel.appendChild(el("option", { value: c }, [c]));
-    });
-    var auto = C.autoDetectSubject(common);
-    if (auto) subjectSel.value = auto;
+        // Subject dropdown.
+        var subjectSel = $("subjectSelect");
+        clear(subjectSel);
+        subjectSel.appendChild(el("option", { value: "" }, ["(none)"]));
+        common.forEach(function (c) {
+          subjectSel.appendChild(el("option", { value: c }, [c]));
+        });
+        if (a.subject) subjectSel.value = a.subject;
 
-    $("keyHint").textContent = keyHintText;
-    $("configCard").classList.remove("hidden");
-    $("configCard").scrollIntoView({ behavior: "smooth", block: "start" });
-    updateConfigHint();
+        $("keyHint").textContent = a.keyHint;
+        renderSizeNotice();
+        $("configCard").classList.remove("hidden");
+        $("configCard").scrollIntoView({ behavior: "smooth", block: "start" });
+        updateConfigHint();
+      })
+      .catch(function (e) {
+        endProgress();
+        showError((e && e.message) || String(e));
+      });
   }
 
   function refreshCompareChips() {
@@ -214,19 +391,25 @@
       numericEqual: $("optNumeric").checked,
       extraMissingTokens: $("optMissing").checked,
     };
-    var result;
-    try {
-      result = C.compareDatasets(state.prev, state.curr, config);
-    } catch (e) {
-      showError(e.message);
-      return;
-    }
-    state.result = result;
-    state.search = "";
-    buildTabs(result);
-    renderResultsShell(result);
-    $("resultsCard").classList.remove("hidden");
-    $("resultsCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    $("compareBtn").disabled = true;
+    beginProgress("Comparing datasets…");
+    engine
+      .compare(config)
+      .then(function (result) {
+        endProgress();
+        updateConfigHint();
+        state.result = result;
+        state.search = "";
+        buildTabs(result);
+        renderResultsShell(result);
+        $("resultsCard").classList.remove("hidden");
+        $("resultsCard").scrollIntoView({ behavior: "smooth", block: "start" });
+      })
+      .catch(function (e) {
+        endProgress();
+        updateConfigHint();
+        showError((e && e.message) || String(e));
+      });
   }
 
   function showError(msg) {
@@ -605,6 +788,7 @@
   // Sample data
   // --------------------------------------------------------------------------
   function loadPair(prevFile, currFile) {
+    beginProgress("Loading demo…");
     Promise.all([
       fetch(prevFile).then(function (r) {
         return r.text();
@@ -614,17 +798,24 @@
       }),
     ])
       .then(function (texts) {
-        var prev = C.parseCSV(texts[0]);
-        prev.name = prevFile;
-        var curr = C.parseCSV(texts[1]);
-        curr.name = currFile;
-        state.prev = prev;
-        state.curr = curr;
-        $("prevName").textContent = prev.name + " · " + prev.records.length + " rows · " + prev.headers.length + " cols";
-        $("currName").textContent = curr.name + " · " + curr.records.length + " rows · " + curr.headers.length + " cols";
-        maybeShowConfig();
+        return engine
+          .parse("prev", prevFile, texts[0])
+          .then(function (p) {
+            state.prev = { name: prevFile, headers: p.headers, rowCount: p.rowCount };
+            $("prevName").textContent =
+              prevFile + " · " + p.rowCount + " rows · " + p.headers.length + " cols";
+            return engine.parse("curr", currFile, texts[1]);
+          })
+          .then(function (cInfo) {
+            state.curr = { name: currFile, headers: cInfo.headers, rowCount: cInfo.rowCount };
+            $("currName").textContent =
+              currFile + " · " + cInfo.rowCount + " rows · " + cInfo.headers.length + " cols";
+            endProgress();
+            maybeShowConfig();
+          });
       })
       .catch(function () {
+        endProgress();
         $("prevName").textContent = "Sample files not found (serve this folder over http).";
       });
   }
@@ -641,6 +832,8 @@
   // Wire up
   // --------------------------------------------------------------------------
   function init() {
+    engine = createEngine(updateProgressText);
+
     setupDrop("dropPrev", "prevFile", "prevName", "prev");
     setupDrop("dropCurr", "currFile", "currName", "curr");
     $("loadDemoSdtm").addEventListener("click", loadDemoSdtm);
@@ -650,6 +843,16 @@
     $("search").addEventListener("input", function (e) {
       state.search = e.target.value;
       renderActiveTab();
+    });
+
+    // Privacy details modal
+    $("privacyBadge").addEventListener("click", openPrivacy);
+    $("privacyModalClose").addEventListener("click", closePrivacy);
+    $("privacyModal").addEventListener("click", function (e) {
+      if (e.target === $("privacyModal")) closePrivacy();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closePrivacy();
     });
   }
 
