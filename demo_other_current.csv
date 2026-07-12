@@ -1,0 +1,10 @@
+region,store_id,sku,product_name,on_hand,unit_price,reorder_flag
+West,S1,A100,Widget,35,5.00,N
+West,S1,A200,Gadget,30,9.00,N
+West,S1,B300,Gizmo,12,15.00,N
+West,S1,C400,Sprocket,100,3.50,N
+East,S2,A100,Widget,40,5.00,N
+East,S2,B300,Gizmo,8,16.50,N
+North,S3,A100,Widget,60,5.00,N
+North,S3,A200,Gadget,0,9.00,Y
+North,S3,B300,Gizmo,15,15.00,N

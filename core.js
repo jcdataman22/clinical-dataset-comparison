@@ -429,8 +429,8 @@
           : 0;
       var name = col.toLowerCase();
       var nameHint =
-        /(^|[^a-z])(id|key|seq|no|num|code|idx|index|uuid|guid|subj|subject|visit|record)([^a-z]|$)/.test(name) ||
-        /id$|seq$|no$|num$|code$|key$/.test(name)
+        /(^|[^a-z])(id|key|seq|no|num|code|idx|index|uuid|guid|subj|subject|visit|record|sku|ean|upc|isbn|acct|account)([^a-z]|$)/.test(name) ||
+        /id$|seq$|no$|num$|code$|key$|sku$/.test(name)
           ? 1
           : 0;
       return overlap * 3 + distinctRatio * 2 + nameHint * 1.5 - nullRate * 2;

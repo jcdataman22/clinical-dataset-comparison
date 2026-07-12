@@ -60,15 +60,16 @@ To run the test suite, open `http://localhost:8722/tests.html` — it shows
 `44 passed, 0 failed` and lists every case.
 
 > You can also open `index.html` directly from disk and use the two file
-> pickers; only the **Load demo datasets** button requires the local server.
+> pickers; only the demo buttons require the local server.
 
 ---
 
 ## How to use
 
 1. **Load the two transfers.** Drop or browse to your *previous* and *current*
-   CSVs (or click **Load demo datasets** to try it with built-in example data
-   that exercises every capability at once).
+   CSVs (or click **Load SDTM format demo** for clinical lab data, or
+   **Load other format demo** for a non-SDTM inventory dataset where the app
+   infers the composite key on its own).
 2. **Choose how to match records.**
    - **Key columns** — the columns that uniquely identify one record. SDTM
      identifiers (`STUDYID`, `DOMAIN`, `USUBJID`, and the first `*SEQ` column)
@@ -137,7 +138,8 @@ the files on your own machine.
 | `app.js` | UI: file loading, config, rendering, export |
 | `core.js` | Dependency-free comparison engine (CSV parse + diff) |
 | `tests.html` / `tests.js` | Browser-based unit tests (44 cases) |
-| `demo_previous.csv` / `demo_current.csv` | Built-in demo SDTM lab data |
+| `demo_previous.csv` / `demo_current.csv` | Built-in SDTM lab demo |
+| `demo_other_previous.csv` / `demo_other_current.csv` | Built-in non-SDTM inventory demo |
 
 ---
 

@@ -1,0 +1,9 @@
+region,store_id,sku,product_name,on_hand,unit_price,supplier
+West,S1,A100,Widget,50,5.00,Acme
+West,S1,A200,Gadget,30,9.00,Acme
+West,S1,B300,Gizmo,12,15.00,Beta
+East,S2,A100,Widget,40,5.00,Acme
+East,S2,A200,Gadget,25,9.00,Acme
+East,S2,B300,Gizmo,8,15.00,Beta
+North,S3,A100,Widget,60,5.00,Acme
+North,S3,A200,Gadget,20,9.00,Acme

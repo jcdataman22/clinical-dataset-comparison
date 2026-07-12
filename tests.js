@@ -296,6 +296,25 @@
     eq(r.unique, false);
   });
 
+  test("inferKeyColumns: finds a composite key with no naming convention", function () {
+    var prev = ds2(["region", "store_id", "sku", "product_name", "on_hand", "unit_price"], [
+      { region: "West", store_id: "S1", sku: "A100", product_name: "Widget", on_hand: "50", unit_price: "5.00" },
+      { region: "West", store_id: "S1", sku: "A200", product_name: "Gadget", on_hand: "30", unit_price: "9.00" },
+      { region: "East", store_id: "S2", sku: "A100", product_name: "Widget", on_hand: "40", unit_price: "5.00" },
+      { region: "East", store_id: "S2", sku: "A200", product_name: "Gadget", on_hand: "25", unit_price: "9.00" },
+    ]);
+    var curr = ds2(["region", "store_id", "sku", "product_name", "on_hand", "unit_price"], [
+      { region: "West", store_id: "S1", sku: "A100", product_name: "Widget", on_hand: "35", unit_price: "5.00" },
+      { region: "West", store_id: "S1", sku: "A200", product_name: "Gadget", on_hand: "30", unit_price: "9.00" },
+      { region: "East", store_id: "S2", sku: "A100", product_name: "Widget", on_hand: "40", unit_price: "5.00" },
+      { region: "East", store_id: "S2", sku: "A200", product_name: "Gadget", on_hand: "25", unit_price: "9.50" },
+    ]);
+    var r = C.inferKeyColumns(prev, curr);
+    ok(r.unique, "store_id+sku should be unique");
+    ok(r.keyColumns.indexOf("store_id") !== -1 && r.keyColumns.indexOf("sku") !== -1, "should pick store_id and sku");
+    ok(r.keyColumns.indexOf("on_hand") === -1 && r.keyColumns.indexOf("unit_price") === -1, "should not pick value columns");
+  });
+
   test("inferKeyColumns: works on SDTM-style data", function () {
     var prev = ds2(["STUDYID", "USUBJID", "LBSEQ", "LBORRES"], [
       { STUDYID: "S", USUBJID: "P1", LBSEQ: "1", LBORRES: "5" },

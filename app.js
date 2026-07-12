@@ -629,8 +629,12 @@
       });
   }
 
-  function loadDemo() {
+  function loadDemoSdtm() {
     loadPair("demo_previous.csv", "demo_current.csv");
+  }
+
+  function loadDemoOther() {
+    loadPair("demo_other_previous.csv", "demo_other_current.csv");
   }
 
   // --------------------------------------------------------------------------
@@ -639,7 +643,8 @@
   function init() {
     setupDrop("dropPrev", "prevFile", "prevName", "prev");
     setupDrop("dropCurr", "currFile", "currName", "curr");
-    $("loadDemo").addEventListener("click", loadDemo);
+    $("loadDemoSdtm").addEventListener("click", loadDemoSdtm);
+    $("loadDemoOther").addEventListener("click", loadDemoOther);
     $("compareBtn").addEventListener("click", runCompare);
     $("exportBtn").addEventListener("click", exportCurrent);
     $("search").addEventListener("input", function (e) {
