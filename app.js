@@ -546,20 +546,20 @@
   // --------------------------------------------------------------------------
   // Sample data
   // --------------------------------------------------------------------------
-  function loadSample() {
+  function loadPair(prevFile, currFile) {
     Promise.all([
-      fetch("sample_previous.csv").then(function (r) {
+      fetch(prevFile).then(function (r) {
         return r.text();
       }),
-      fetch("sample_current.csv").then(function (r) {
+      fetch(currFile).then(function (r) {
         return r.text();
       }),
     ])
       .then(function (texts) {
         var prev = C.parseCSV(texts[0]);
-        prev.name = "sample_previous.csv";
+        prev.name = prevFile;
         var curr = C.parseCSV(texts[1]);
-        curr.name = "sample_current.csv";
+        curr.name = currFile;
         state.prev = prev;
         state.curr = curr;
         $("prevName").textContent = prev.name + " · " + prev.records.length + " rows · " + prev.headers.length + " cols";
@@ -571,6 +571,14 @@
       });
   }
 
+  function loadSample() {
+    loadPair("sample_previous.csv", "sample_current.csv");
+  }
+
+  function loadDemo() {
+    loadPair("demo_previous.csv", "demo_current.csv");
+  }
+
   // --------------------------------------------------------------------------
   // Wire up
   // --------------------------------------------------------------------------
@@ -578,6 +586,7 @@
     setupDrop("dropPrev", "prevFile", "prevName", "prev");
     setupDrop("dropCurr", "currFile", "currName", "curr");
     $("loadSample").addEventListener("click", loadSample);
+    $("loadDemo").addEventListener("click", loadDemo);
     $("compareBtn").addEventListener("click", runCompare);
     $("exportBtn").addEventListener("click", exportCurrent);
     $("search").addEventListener("input", function (e) {
