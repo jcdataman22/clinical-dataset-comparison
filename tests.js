@@ -453,7 +453,7 @@
     eq(res.variableSummary[0].changed, 2);
   });
 
-  test("compareDatasets: subject summary rollup", function () {
+  test("compareDatasets: roll up by a single column", function () {
     var prev = ds(
       ["USUBJID", "LBSEQ", "LBORRES"],
       [
@@ -472,10 +472,62 @@
     );
     var res = C.compareDatasets(prev, curr, {
       keyColumns: ["USUBJID", "LBSEQ"],
-      subjectColumn: "USUBJID",
+      groupByColumns: ["USUBJID"],
     });
-    eq(res.subjectSummary[0].subject, "P1");
-    eq(res.subjectSummary[0].changed, 2);
+    eq(res.groupSummary[0].values.USUBJID, "P1");
+    eq(res.groupSummary[0].changed, 2);
+    deepEq(res.config.groupByColumns, ["USUBJID"]);
+  });
+
+  test("compareDatasets: legacy subjectColumn still rolls up", function () {
+    var prev = ds(["ID", "V"], [{ ID: "1", V: "a" }]);
+    var curr = ds(["ID", "V"], [{ ID: "1", V: "b" }]);
+    var res = C.compareDatasets(prev, curr, { keyColumns: ["ID"], subjectColumn: "V" });
+    eq(res.groupSummary.length, 1);
+    eq(res.config.groupByColumns[0], "V");
+  });
+
+  test("compareDatasets: roll up by two columns", function () {
+    var prev = ds(
+      ["site", "arm", "id", "v"],
+      [
+        { site: "A", arm: "X", id: "1", v: "1" },
+        { site: "A", arm: "Y", id: "2", v: "1" },
+        { site: "B", arm: "X", id: "3", v: "1" },
+      ]
+    );
+    var curr = ds(
+      ["site", "arm", "id", "v"],
+      [
+        { site: "A", arm: "X", id: "1", v: "9" }, // changed → (A,X)
+        { site: "A", arm: "Y", id: "2", v: "1" }, // unchanged
+        { site: "B", arm: "X", id: "3", v: "9" }, // changed → (B,X)
+      ]
+    );
+    var res = C.compareDatasets(prev, curr, { keyColumns: ["id"], groupByColumns: ["site", "arm"] });
+    eq(res.groupSummary.length, 2);
+    ok(
+      res.groupSummary.every(function (g) {
+        return g.changed === 1;
+      })
+    );
+    ok(
+      res.groupSummary.some(function (g) {
+        return g.values.site === "A" && g.values.arm === "X";
+      })
+    );
+    ok(
+      res.groupSummary.some(function (g) {
+        return g.values.site === "B" && g.values.arm === "X";
+      })
+    );
+  });
+
+  test("compareDatasets: roll up caps at 3 columns", function () {
+    var prev = ds(["a", "b", "c", "d", "id", "v"], [{ a: "1", b: "2", c: "3", d: "4", id: "1", v: "x" }]);
+    var curr = ds(["a", "b", "c", "d", "id", "v"], [{ a: "1", b: "2", c: "3", d: "4", id: "1", v: "y" }]);
+    var res = C.compareDatasets(prev, curr, { keyColumns: ["id"], groupByColumns: ["a", "b", "c", "d"] });
+    deepEq(res.config.groupByColumns, ["a", "b", "c"]);
   });
 
   test("compareDatasets: label column carried into cell changes", function () {

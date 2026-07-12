@@ -502,7 +502,7 @@
       keyColumns: [],
       compareColumns: null, // null => all common non-key columns
       labelColumns: [],
-      subjectColumn: null,
+      groupByColumns: [],
       ignoreWhitespace: true,
       ignoreCase: false,
       numericEqual: false,
@@ -677,35 +677,54 @@
         return b.changed - a.changed;
       });
 
-    // Per-subject rollup.
-    var subjectSummary = [];
-    if (config.subjectColumn && commonColumns.indexOf(config.subjectColumn) !== -1) {
-      var sc = config.subjectColumn;
-      var bySubject = {};
-      function bump(subject, field) {
-        if (subject == null) subject = "";
-        if (!bySubject[subject]) {
-          bySubject[subject] = { subject: subject, added: 0, removed: 0, changed: 0 };
+    // Roll-up: group added/removed/changed records by up to 3 chosen columns.
+    var groupCols = [];
+    if (config.groupByColumns && config.groupByColumns.length) {
+      groupCols = config.groupByColumns;
+    } else if (config.subjectColumn) {
+      groupCols = [config.subjectColumn];
+    }
+    groupCols = groupCols
+      .filter(function (c) {
+        return commonColumns.indexOf(c) !== -1;
+      })
+      .slice(0, 3);
+
+    var groupSummary = [];
+    if (groupCols.length) {
+      var groups = {};
+      var makeGroupKey = function (rec) {
+        return groupCols
+          .map(function (c) {
+            return rec && rec[c] != null ? String(rec[c]) : "";
+          })
+          .join("");
+      };
+      var groupBump = function (rec, field) {
+        var k = makeGroupKey(rec);
+        if (!groups[k]) {
+          var values = {};
+          groupCols.forEach(function (c) {
+            values[c] = rec && rec[c] != null ? rec[c] : "";
+          });
+          groups[k] = { values: values, added: 0, removed: 0, changed: 0 };
         }
-        bySubject[subject][field]++;
-      }
+        groups[k][field]++;
+      };
       addedRecords.forEach(function (r) {
-        bump(r[sc], "added");
+        groupBump(r, "added");
       });
       removedRecords.forEach(function (r) {
-        bump(r[sc], "removed");
+        groupBump(r, "removed");
       });
       changedRecords.forEach(function (r) {
-        var currRec = currIndex.map.get(r.key);
-        bump(currRec ? currRec[sc] : "", "changed");
+        groupBump(currIndex.map.get(r.key) || {}, "changed");
       });
-      Object.keys(bySubject).forEach(function (s) {
-        subjectSummary.push(bySubject[s]);
+      Object.keys(groups).forEach(function (k) {
+        groupSummary.push(groups[k]);
       });
-      subjectSummary.sort(function (a, b) {
-        var ta = a.added + a.removed + a.changed;
-        var tb = b.added + b.removed + b.changed;
-        return tb - ta;
+      groupSummary.sort(function (a, b) {
+        return b.added + b.removed + b.changed - (a.added + a.removed + a.changed);
       });
     }
 
@@ -714,7 +733,7 @@
         keyColumns: keyColumns.slice(),
         compareColumns: compareColumns.slice(),
         labelColumns: labelColumns.slice(),
-        subjectColumn: config.subjectColumn || null,
+        groupByColumns: groupCols.slice(),
         options: opts,
       },
       schema: {
@@ -743,7 +762,7 @@
       changedRecords: changedRecords,
       cellChanges: cellChanges,
       variableSummary: variableSummary,
-      subjectSummary: subjectSummary,
+      groupSummary: groupSummary,
     };
   }
 

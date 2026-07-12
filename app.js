@@ -58,7 +58,7 @@
   function createEngine(onProgress) {
     if (typeof Worker !== "undefined") {
       try {
-        var w = new Worker("worker.js?v=5");
+        var w = new Worker("worker.js?v=9");
         var eng = workerEngine(w, onProgress);
         // Validate the worker (catches CSP / importScripts failures, file://,
         // etc.). If it can't run, quietly downgrade to the main-thread engine.
@@ -308,14 +308,11 @@
         buildChips("labelChips", common, state.labelSel, null);
         refreshCompareChips();
 
-        // Subject dropdown.
-        var subjectSel = $("subjectSelect");
-        clear(subjectSel);
-        subjectSel.appendChild(el("option", { value: "" }, ["(none)"]));
-        common.forEach(function (c) {
-          subjectSel.appendChild(el("option", { value: c }, [c]));
-        });
-        if (a.subject) subjectSel.value = a.subject;
+        // Roll-up columns (choose up to 3).
+        state.groupSel = {};
+        if (a.subject) state.groupSel[a.subject] = true;
+        buildGroupChips(common);
+        $("groupHint").textContent = GROUP_HELP;
 
         $("keyHint").textContent = a.keyHint;
         renderSizeNotice();
@@ -363,6 +360,41 @@
     });
   }
 
+  var GROUP_HELP =
+    "Adds a “By …” tab that tallies added, removed, and changed records for each group. This only affects that summary view — not what’s compared.";
+
+  function flashGroupHint() {
+    var h = $("groupHint");
+    if (!h) return;
+    h.textContent = "You can roll up by at most 3 fields — deselect one first.";
+    h.classList.add("warn-hint");
+    clearTimeout(h._t);
+    h._t = setTimeout(function () {
+      h.textContent = GROUP_HELP;
+      h.classList.remove("warn-hint");
+    }, 2500);
+  }
+
+  function buildGroupChips(columns) {
+    var container = $("groupChips");
+    clear(container);
+    columns.forEach(function (col) {
+      var input = el("input", { type: "checkbox" });
+      input.checked = !!state.groupSel[col];
+      var chip = el("label", { class: "chip" + (input.checked ? " on" : "") }, [input, col]);
+      input.addEventListener("change", function () {
+        if (input.checked && selectedList(state.groupSel).length >= 3) {
+          input.checked = false;
+          flashGroupHint();
+          return;
+        }
+        state.groupSel[col] = input.checked;
+        chip.classList.toggle("on", input.checked);
+      });
+      container.appendChild(chip);
+    });
+  }
+
   function selectedList(selMap) {
     return Object.keys(selMap).filter(function (k) {
       return selMap[k];
@@ -385,12 +417,15 @@
       keyColumns: selectedList(state.keySel),
       compareColumns: selectedList(state.compareSel),
       labelColumns: selectedList(state.labelSel),
-      subjectColumn: $("subjectSelect").value || null,
+      groupByColumns: selectedList(state.groupSel),
       ignoreWhitespace: $("optWhitespace").checked,
       ignoreCase: $("optCase").checked,
       numericEqual: $("optNumeric").checked,
       extraMissingTokens: $("optMissing").checked,
     };
+    // Remember which tab is open so we can stay on it after re-comparing.
+    var prevActiveId =
+      state.tabs && state.tabs[state.activeTab] ? state.tabs[state.activeTab].id : null;
     $("compareBtn").disabled = true;
     beginProgress("Comparing datasets…");
     engine
@@ -400,7 +435,8 @@
         updateConfigHint();
         state.result = result;
         state.search = "";
-        buildTabs(result);
+        $("search").value = "";
+        buildTabs(result, prevActiveId);
         renderResultsShell(result);
         $("resultsCard").classList.remove("hidden");
         $("resultsCard").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -526,7 +562,7 @@
     ]);
   }
 
-  function buildTabs(result) {
+  function buildTabs(result, preferredId) {
     var keys = result.config.keyColumns;
     var labels = result.config.labelColumns;
 
@@ -582,35 +618,46 @@
       },
     ];
 
-    if (result.subjectSummary.length) {
-      // Use the actual column the user chose to summarize by, so the tab label,
-      // column header, and export name reflect that variable's name.
-      var summaryVar = result.config.subjectColumn || "group";
+    if (result.groupSummary && result.groupSummary.length) {
+      // Roll-up grouped by the 1–3 columns the user chose; the tab label,
+      // headers, and export name reflect those column names.
+      var gCols = result.config.groupByColumns;
       state.tabs.push({
-        id: "subjects",
-        label: "By " + summaryVar,
-        count: result.subjectSummary.length,
-        columns: [summaryVar, "added", "removed", "changed", "total"],
-        rows: result.subjectSummary.map(function (s) {
+        id: "groups",
+        label: "By " + gCols.join(" + "),
+        count: result.groupSummary.length,
+        columns: gCols.concat(["added", "removed", "changed", "total"]),
+        rows: result.groupSummary.map(function (g) {
           var row = {
-            added: s.added,
-            removed: s.removed,
-            changed: s.changed,
-            total: s.added + s.removed + s.changed,
+            added: g.added,
+            removed: g.removed,
+            changed: g.changed,
+            total: g.added + g.removed + g.changed,
           };
-          row[summaryVar] = s.subject;
+          gCols.forEach(function (c) {
+            row[c] = g.values[c];
+          });
           return row;
         }),
         kind: "generic",
-        exportName: "summary_by_" + summaryVar + ".csv",
+        exportName: "rollup_by_" + gCols.join("_") + ".csv",
       });
     }
 
-    state.activeTab = 0;
+    // Stay on the previously active tab (by id) after a re-compare, if it still
+    // exists; otherwise default to the first tab.
+    var activeIdx = 0;
+    if (preferredId) {
+      state.tabs.forEach(function (t, i) {
+        if (t.id === preferredId) activeIdx = i;
+      });
+    }
+    state.activeTab = activeIdx;
+
     var tabsEl = $("tabs");
     clear(tabsEl);
     state.tabs.forEach(function (t, i) {
-      var btn = el("button", { class: "tab" + (i === 0 ? " active" : "") }, [
+      var btn = el("button", { class: "tab" + (i === activeIdx ? " active" : "") }, [
         t.label + " ",
         el("span", { class: "count" }, ["(" + t.count + ")"]),
       ]);
@@ -841,7 +888,7 @@
     // Visible build stamp so it's easy to confirm the latest code is loaded
     // (and to diagnose browser caching). Bump alongside the ?v= asset tags.
     var buildTag = $("buildTag");
-    if (buildTag) buildTag.textContent = "Build v8";
+    if (buildTag) buildTag.textContent = "Build v9";
 
     setupDrop("dropPrev", "prevFile", "prevName", "prev");
     setupDrop("dropCurr", "currFile", "currName", "curr");

@@ -6,7 +6,7 @@
  * Protocol: main posts { type, id, ... }; worker replies { type:"done", id,
  * result | error } and interleaves { type:"progress", stage }.
  */
-importScripts("core.js?v=5", "engine-core.js?v=5");
+importScripts("core.js?v=9", "engine-core.js?v=9");
 
 var engine = new self.EngineCore();
 

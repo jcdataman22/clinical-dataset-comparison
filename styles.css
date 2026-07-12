@@ -224,6 +224,7 @@ header.app-header p { margin: 0; color: var(--muted); }
 
 .field { margin-bottom: 14px; }
 .field-hint { margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.4; }
+.field-hint.warn-hint { color: var(--modified); font-weight: 600; }
 .field label.field-label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
 select, input[type="text"] {
   width: 100%;
