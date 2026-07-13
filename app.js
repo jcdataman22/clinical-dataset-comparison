@@ -888,7 +888,7 @@
     // Visible build stamp so it's easy to confirm the latest code is loaded
     // (and to diagnose browser caching). Bump alongside the ?v= asset tags.
     var buildTag = $("buildTag");
-    if (buildTag) buildTag.textContent = "Build v9";
+    if (buildTag) buildTag.textContent = "Build v10";
 
     setupDrop("dropPrev", "prevFile", "prevName", "prev");
     setupDrop("dropCurr", "currFile", "currName", "curr");

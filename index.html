@@ -131,17 +131,18 @@
         <ul class="modal-list">
           <li><strong>Read locally.</strong> When you load CSV files, the browser reads them on your device with its built-in file reader. They stay in memory only while you work.</li>
           <li><strong>Never uploaded.</strong> The app makes no network request that carries your data. A strict Content-Security-Policy tells your browser to block any connection to another server.</li>
-          <li><strong>Not stored.</strong> Nothing is written to disk, cookies, or browser storage — close the tab and the data is gone. Files you choose to <em>Export</em> are saved to your own computer.</li>
+          <li><strong>Never cached or stored.</strong> Your data is never written to disk, cookies, or any browser storage — no HTTP cache, no service worker or Cache Storage, no IndexedDB, no localStorage. Close the tab and it's gone. Files you choose to <em>Export</em> are saved to your own computer.</li>
+          <li><strong>Extensions &amp; caching.</strong> Because nothing is cached or stored, a browser extension has nothing to harvest later. The only thing an extension you've allowed onto the page can read is the results currently shown on screen — just as on any website — and even that is gone once you close the tab.</li>
           <li><strong>No third parties.</strong> No analytics, trackers, ads, or external code — just a few small files served as static content.</li>
           <li><strong>Works offline.</strong> Once the page has loaded you can disconnect from the internet and it still works — the simplest proof that nothing needs to be sent.</li>
         </ul>
-        <p class="modal-note">Like any website, the host sees your browser request the page and your IP address, but never your file contents. Browser extensions you install can read any page you open, so use ones you trust.</p>
+        <p class="modal-note">Like any website, the host sees your browser request the page and your IP address, but never your file contents.</p>
         <p class="modal-verify">Want to verify it yourself? Open your browser's Network tab, load a file, and run a comparison — you'll see no request carrying your data.</p>
       </div>
     </div>
 
     <script src="core.js?v=9"></script>
     <script src="engine-core.js?v=9"></script>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
   </body>
 </html>
